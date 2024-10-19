@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate serde_json;
 
+use std::sync::{Arc, Mutex};
 use std::env;
 use std::net::SocketAddr;
 use actix_web::{web, App, HttpServer, Responder, HttpResponse, post};
@@ -11,6 +12,8 @@ use std::io::Write;
 use serde_json::Value;
 use chrono::Utc;
 use uuid::Uuid;
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
 
 #[derive(Deserialize)]
 struct PublicInputs {
@@ -55,7 +58,7 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
     let salt = format!("{}_{}", timestamp, uuid);
 
     // Construct unique file names using the salt
-    let inputs_file = format!("/usr/src/app/circuits/utils/inputs_{}.json", salt);
+    let inputs_file = format!("./circuits/utils/inputs_{}.json", salt);
     let witness_file = format!("witness_{}.wtns", salt);
     let proof_file = format!("proof_{}.json", salt);
     let public_file = format!("public_{}.json", salt);
@@ -82,7 +85,7 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
         .args(&[
             "wtns",
             "calculate",
-            "/usr/src/app/circuits/AgeVerificationWithSignature_js/AgeVerificationWithSignature.wasm",
+            "./circuits/AgeVerificationWithSignature_js/AgeVerificationWithSignature.wasm",
             &inputs_file,
             &witness_file,
         ])
@@ -98,7 +101,7 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
         .args(&[
             "groth16",
             "prove",
-            "/usr/src/app/circuits/age_verification2.zkey",
+            "./circuits/age_verification2.zkey",
             &witness_file,
             &proof_file,
             &public_file,
@@ -122,14 +125,51 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
     }
 }
 
+// Shared state to hold proof generation result
+#[derive(Clone)]
+struct AppState {
+    result: Arc<Mutex<Option<ProofResponse>>>,
+}
+
 #[post("/generate-proof")]
-async fn generate_proof(inputs: web::Json<PublicInputs>) -> impl Responder {
-    let result = generate_proof_from_inputs(&inputs).await;
-    HttpResponse::Ok().json(ProofResponse {
-        proof: result.proof,
-        status: "success".to_string(),
-        id: result.salt,
-    })
+async fn generate_proof(state: web::Data<AppState>, inputs: web::Json<PublicInputs>) -> impl Responder {
+    let state_clone = state.result.clone();
+
+    // Spawn a new task to generate proof
+    tokio::spawn(async move {
+        let result = generate_proof_from_inputs(&inputs).await;
+
+        // Store the result in shared state
+        let mut result_lock = state_clone.lock().unwrap();
+        *result_lock = Some(ProofResponse {
+            proof: result.proof,
+            status: "success".to_string(),
+            id: result.salt,
+        });
+    });
+
+    // Long polling loop
+    let mut attempts = 0;
+    let last_keep_alive = Instant::now();
+
+    while attempts < 30 { // Limit the number of attempts to avoid infinite loop
+        {
+            let result_lock = state.result.lock().unwrap();
+            if let Some(response) = &*result_lock {
+                return HttpResponse::Ok().json(response);
+            }
+        }
+
+        // Send a keep-alive response every 30 seconds
+        if last_keep_alive.elapsed() >= Duration::from_secs(30) {
+            return HttpResponse::Ok().body(" "); // Sending a single space to keep connection alive
+        }
+
+        attempts += 1;
+        sleep(Duration::from_secs(1)).await; // Wait before checking again
+    }
+
+    HttpResponse::InternalServerError().json("Proof generation timed out.")
 }
 
 async fn verify_proof(inputs: &ProofInputs) -> bool {
@@ -177,6 +217,10 @@ async fn verify_proof_endpoint(inputs: web::Json<ProofInputs>) -> impl Responder
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let shared_state = AppState {
+        result: Arc::new(Mutex::new(None)),
+    };
+
     // Get the port from the environment, default to 8000 if not set
     let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
     let port: u16 = port.parse().expect("PORT must be a number");
@@ -184,8 +228,9 @@ async fn main() -> std::io::Result<()> {
     // Create the server address
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    HttpServer::new(|| {
+    HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(shared_state.clone()))
             .service(generate_proof)
             .service(verify_proof_endpoint)
     })

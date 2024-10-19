@@ -41,6 +41,9 @@ COPY --from=builder /usr/src/app/target/release/crede-api .
 # Make sure the binary is executable
 RUN chmod +x ./crede-api
 
+# Set the RUST_BACKTRACE environment variable
+ENV RUST_BACKTRACE=1
+
 # Expose the port the API will run on
 EXPOSE 8000
 

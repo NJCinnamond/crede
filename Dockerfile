@@ -33,7 +33,10 @@ WORKDIR /usr/src/app
 # Copy specific files from the circuits directory
 COPY ./circuits/utils/inputs.json ./circuits/utils/inputs.json
 COPY ./circuits/AgeVerificationWithSignature_js/AgeVerificationWithSignature.wasm ./circuits/AgeVerificationWithSignature_js/AgeVerificationWithSignature.wasm
-COPY ./circuits/age_verification.zkey ./circuits/age_verification.zkey
+
+#COPY ./circuits/age_verification.zkey ./circuits/age_verification.zkey
+RUN curl -o ./circuits/age_verification.zkey \
+    "https://crede-artifacts.s3.amazonaws.com/age_verification2.zkey"
 
 # Copy the compiled binary from the build environment
 COPY --from=builder /usr/src/app/target/release/crede-api .

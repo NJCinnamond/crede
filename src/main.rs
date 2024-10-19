@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate serde_json;
 
+use std::env;
+use std::net::SocketAddr;
 use actix_web::{web, App, HttpServer, Responder, HttpResponse, post};
 use serde::{Deserialize, Serialize};
 use std::process::Command;
@@ -175,12 +177,19 @@ async fn verify_proof_endpoint(inputs: web::Json<ProofInputs>) -> impl Responder
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Get the port from the environment, default to 8000 if not set
+    let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+    let port: u16 = port.parse().expect("PORT must be a number");
+
+    // Create the server address
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+
     HttpServer::new(|| {
         App::new()
             .service(generate_proof)
             .service(verify_proof_endpoint)
     })
-    .bind("0.0.0.0:8000")?
+    .bind(addr)?
     .run()
     .await
 }

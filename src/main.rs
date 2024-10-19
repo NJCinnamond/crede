@@ -58,7 +58,7 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
     let salt = format!("{}_{}", timestamp, uuid);
 
     // Construct unique file names using the salt
-    let inputs_file = format!("./circuits/utils/inputs_{}.json", salt);
+    let inputs_file = format!("/usr/src/app/circuits/utils/inputs_{}.json", salt);
     let witness_file = format!("witness_{}.wtns", salt);
     let proof_file = format!("proof_{}.json", salt);
     let public_file = format!("public_{}.json", salt);
@@ -85,7 +85,7 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
         .args(&[
             "wtns",
             "calculate",
-            "./circuits/AgeVerificationWithSignature_js/AgeVerificationWithSignature.wasm",
+            "/usr/src/app/circuits/AgeVerificationWithSignature_js/AgeVerificationWithSignature.wasm",
             &inputs_file,
             &witness_file,
         ])
@@ -101,7 +101,7 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
         .args(&[
             "groth16",
             "prove",
-            "./circuits/age_verification2.zkey",
+            "/usr/src/app/circuits/age_verification2.zkey",
             &witness_file,
             &proof_file,
             &public_file,
@@ -148,11 +148,10 @@ async fn generate_proof(state: web::Data<AppState>, inputs: web::Json<PublicInpu
         });
     });
 
-    // Long polling loop
     let mut attempts = 0;
-    let last_keep_alive = Instant::now();
+    let mut last_keep_alive = Instant::now();
 
-    while attempts < 30 { // Limit the number of attempts to avoid infinite loop
+    while attempts < 1000 { // Limit the number of attempts to avoid infinite loop
         {
             let result_lock = state.result.lock().unwrap();
             if let Some(response) = &*result_lock {
@@ -160,8 +159,9 @@ async fn generate_proof(state: web::Data<AppState>, inputs: web::Json<PublicInpu
             }
         }
 
-        // Send a keep-alive response every 30 seconds
-        if last_keep_alive.elapsed() >= Duration::from_secs(30) {
+        // Send a keep-alive response every 20 seconds
+        if last_keep_alive.elapsed() >= Duration::from_secs(20) {
+            last_keep_alive = Instant::now(); // Reset the keep-alive timer
             return HttpResponse::Ok().body(" "); // Sending a single space to keep connection alive
         }
 
@@ -195,7 +195,7 @@ async fn verify_proof(inputs: &ProofInputs) -> bool {
         .args(&[
             "groth16",
             "verify",
-            "./circuits/verification_key.json",
+            "/usr/src/app/circuits/verification_key.json",
             &public_file,
             &proof_file  // Use the generated proof file name
         ])

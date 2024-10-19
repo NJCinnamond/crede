@@ -1,0 +1,11 @@
+/target
+
+/circuits/node_modules/*
+
+/circuits/pot12*
+
+/circuits/*.zkey
+
+/circuits/AgeVerificationWithSignature.r1cs
+/circuits/AgeVerificationWithSignature.sym
+/circuits/AgeVerificationWithSignature_constraints.json

@@ -53,7 +53,7 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
     let salt = format!("{}_{}", timestamp, uuid);
 
     // Construct unique file names using the salt
-    let inputs_file = format!("./circuits/utils/inputs_{}.json", salt);
+    let inputs_file = format!("/usr/src/app/circuits/utils/inputs_{}.json", salt);
     let witness_file = format!("witness_{}.wtns", salt);
     let proof_file = format!("proof_{}.json", salt);
     let public_file = format!("public_{}.json", salt);
@@ -80,7 +80,7 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
         .args(&[
             "wtns",
             "calculate",
-            "./circuits/AgeVerificationWithSignature_js/AgeVerificationWithSignature.wasm",
+            "/usr/src/app/circuits/AgeVerificationWithSignature_js/AgeVerificationWithSignature.wasm",
             &inputs_file,
             &witness_file,
         ])
@@ -96,7 +96,7 @@ async fn generate_proof_from_inputs(inputs: &PublicInputs) -> ProofAndSalt {
         .args(&[
             "groth16",
             "prove",
-            "./circuits/age_verification2.zkey",
+            "/usr/src/app/circuits/age_verification2.zkey",
             &witness_file,
             &proof_file,
             &public_file,

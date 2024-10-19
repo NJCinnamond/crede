@@ -1,0 +1,19 @@
+{
+  "[solidity]": {
+    "editor.defaultFormatter": "NomicFoundation.hardhat-solidity"
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  },
+  "dotenv.enableAutocloaking": true,
+  "editor.formatOnSave": true,
+  "evenBetterToml.formatter.arrayAutoExpand": true,
+  "evenBetterToml.formatter.indentEntries": true,
+  "evenBetterToml.formatter.indentTables": true,
+  "evenBetterToml.formatter.reorderKeys": true,
+  "files.associations": {
+    ".gas-snapshot": "julia"
+  },
+  "search.exclude": { "**/node_modules": true },
+  "solidity.formatter": "forge"
+}

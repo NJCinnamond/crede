@@ -1,0 +1,1 @@
+- add a makefile and detailed guide

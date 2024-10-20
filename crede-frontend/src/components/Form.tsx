@@ -4,6 +4,7 @@ import { useState } from "react";
 import { buildPoseidon } from "circomlibjs";
 
 export default function Form() {
+  const [activeTab, setActiveTab] = useState<string>("form1"); // State to track active tab
   const [birthdate, setBirthdate] = useState<string>("");
   const [idNumber, setIdNumber] = useState<string>("");
   const [expiryDate, setExpiryDate] = useState<string>("");
@@ -70,61 +71,149 @@ export default function Form() {
 
   return (
     <div className="mt-20 h-screen p-20">
-      <form
-        onSubmit={handleSubmit}
-        className="mx-auto flex w-2/5 flex-col space-y-6 text-2xl ">
-        {/* Birthdate Field */}
-        <div className="mb-8 flex flex-col space-y-2">
-          <label className="mb-2 font-medium tracking-widest text-white">
-            Birthdate:
-          </label>
-          <input
-            type="date"
-            value={birthdate}
-            onChange={(e) => setBirthdate(e.target.value)}
-            required
-            className="rounded border-2 p-2"
-          />
+      {/* Tabs for switching between forms */}
+      <div className="relative mx-auto w-2/5  ">
+        <div className="flex">
+          <button
+            className={`px-6 py-2 text-2xl ${
+              activeTab === "form1"
+                ? "rounded-t-lg  bg-[#1A1D22] text-white"
+                : "bg-transparent text-white hover:rounded-t-lg hover:bg-gradient-to-r hover:from-purple-500 hover:via-pink-500 hover:to-yellow-500"
+            }`}
+            onClick={() => setActiveTab("form1")}>
+            Prover
+          </button>
+          <button
+            className={`px-6 py-2 text-2xl ${
+              activeTab === "form2"
+                ? "rounded-t-lg bg-[#1A1D22] text-white"
+                : " bg-transparent text-white hover:rounded-t-lg hover:bg-gradient-to-r hover:from-purple-500 hover:via-pink-500 hover:to-yellow-500"
+            }`}
+            onClick={() => setActiveTab("form2")}>
+            Issuer
+          </button>
         </div>
+      </div>
 
-        {/* ID Number Field */}
-        <div className="mb-8  flex flex-col space-y-2">
-          <label className="mb-2 font-medium tracking-widest text-white">
-            ID Number:
-          </label>
-          <input
-            type="text"
-            value={idNumber}
-            onChange={(e) => setIdNumber(e.target.value)}
-            required
-            className="rounded border-2 p-2"
-          />
-        </div>
+      {/* Render the corresponding form based on the active tab */}
+      <div className="mx-auto w-2/5 rounded-bl-lg rounded-br-lg rounded-tr-lg  bg-[#1A1D22] p-8">
+        {activeTab === "form1" && (
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col space-y-6 text-2xl">
+            {/* Birthdate Field */}
+            <div className="mb-8 flex flex-col space-y-2">
+              <label className="mb-2 font-medium tracking-widest text-white">
+                Birthdate:
+              </label>
+              <input
+                type="date"
+                value={birthdate}
+                onChange={(e) => setBirthdate(e.target.value)}
+                required
+                className="rounded border-2 p-2"
+              />
+            </div>
 
-        {/* Expiry Date Field */}
-        <div className="mb-8 flex flex-col space-y-2">
-          <label className="mb-2 font-medium tracking-widest text-white">
-            Expiration Date:
-          </label>
-          <input
-            type="date"
-            value={expiryDate}
-            onChange={(e) => setExpiryDate(e.target.value)}
-            required
-            className="rounded border-2 p-2"
-          />
-        </div>
+            {/* ID Number Field */}
+            <div className="mb-8  flex flex-col space-y-2">
+              <label className="mb-2 font-medium tracking-widest text-white">
+                ID Number:
+              </label>
+              <input
+                type="text"
+                value={idNumber}
+                onChange={(e) => setIdNumber(e.target.value)}
+                required
+                className="rounded border-2 p-2"
+              />
+            </div>
 
-        {/* Submit Button */}
-        <button
-          type="submit"
-          className=" mt-8 rounded-md border-2 bg-[#1A1D22] px-4 py-2 font-medium text-white">
-          Generate Proof
-        </button>
-      </form>
+            {/* Expiry Date Field */}
+            <div className="mb-8 flex flex-col space-y-2">
+              <label className="mb-2 font-medium tracking-widest text-white">
+                Expiration Date:
+              </label>
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                required
+                className="rounded border-2 p-2"
+              />
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              className="mt-6 rounded-md border-2 bg-[#1A1D22] px-4 py-4 font-medium text-white">
+              Generate Proof
+            </button>
+          </form>
+        )}
+
+        {activeTab === "form2" && (
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col space-y-6 text-2xl">
+            {/* Birthdate Field */}
+            <div className="mb-8 flex flex-col space-y-2">
+              <label className="mb-2 font-medium tracking-widest text-white">
+                Birthdate:
+              </label>
+              <input
+                type="date"
+                value={birthdate}
+                onChange={(e) => setBirthdate(e.target.value)}
+                required
+                className="rounded border-2 p-2"
+              />
+            </div>
+
+            {/* ID Number Field */}
+            <div className="mb-8  flex flex-col space-y-2">
+              <label className="mb-2 font-medium tracking-widest text-white">
+                ID Number:
+              </label>
+              <input
+                type="text"
+                value={idNumber}
+                onChange={(e) => setIdNumber(e.target.value)}
+                required
+                className="rounded border-2 p-2"
+              />
+            </div>
+
+            {/* Expiry Date Field */}
+            <div className="mb-8 flex flex-col space-y-2">
+              <label className="mb-2 font-medium tracking-widest text-white">
+                Expiration Date:
+              </label>
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                required
+                className="rounded border-2 p-2"
+              />
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              className="mt-6 rounded-md border-2 bg-[#1A1D22] px-4 py-4 font-medium text-white">
+              Generate Proof
+            </button>
+          </form>
+        )}
+      </div>
 
       {/* Response Message */}
-      {responseMessage && <p className="mt-4 text-lg">{responseMessage}</p>}
+      {responseMessage && (
+        <p className="mx-auto mt-4 w-2/5 text-center text-lg text-white">
+          {responseMessage}
+        </p>
+      )}
     </div>
   );
 }

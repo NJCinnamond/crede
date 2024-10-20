@@ -10,7 +10,7 @@ export default function Home() {
 
       {/* <h1 className="">hello world</h1> */}
       <Hero />
-      <div id="target-section">
+      <div id="target-section" className="mt-10">
         <Form />
       </div>
     </div>

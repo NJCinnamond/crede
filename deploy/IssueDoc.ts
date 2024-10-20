@@ -72,10 +72,10 @@ const deploy: DeployFunction = async (hre) => {
     lzTokenFee: 0,
   };
 
-  await source.connect(deployerSigner).issueDoc(deployer, docKeyHash, signedHash, sendParam, fee, {
+  const tx = await source.connect(deployerSigner).issueDoc(deployer, docKeyHash, signedHash, sendParam, fee, {
     value: nativeFee.add(BigNumber.from("10000000000000000")),
   });
-  console.log("here");
+  console.log(`Transaction hash: ${(await tx.wait()).transactionHash}`);
 };
 
 deploy.tags = [contractName];

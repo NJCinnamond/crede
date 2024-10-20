@@ -2,25 +2,18 @@
 
 import { useState } from "react";
 import { buildPoseidon } from "circomlibjs";
-<<<<<<< HEAD
-// import { getSignatureForHash } from "../../rpc/skale";
 import {
   ProofGenerationPayload,
   generateAndWaitForProof,
   verifyProof,
 } from "@/services/credeApiService";
 import { PacmanLoader } from "react-spinners";
-=======
-import { getSignatureForHash } from "../../rpc/skale";
-import { ProofGenerationPayload, generateAndWaitForProof, verifyProof } from "@/services/credeApiService";
-import { PacmanLoader } from 'react-spinners';
 import {
   useAuthModal,
   useLogout,
   useSignerStatus,
   useUser,
 } from "@account-kit/react";
->>>>>>> 8660351 (alchemy integeration)
 
 const splitBigIntToHexChunks = (bigIntValue: bigint) => {
   const mask = BigInt("0xFFFFFFFFFFFFFFFF");

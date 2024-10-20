@@ -42,11 +42,13 @@ export default function Form() {
       return null
     }
 
+    console.log("IS VERIFYING")
+
     setIsVerifying(true)
 
     try {
       await verifyProof({
-        job_id: fetchedJobID,
+        id: fetchedJobID,
         proof: fetchedProof
       })
       setIsVerifying(false)
@@ -141,8 +143,12 @@ export default function Form() {
       // const data = await response.json();
       setResponseMessage(`Status: ${response}`);
 
-      if (response.proof) {
-        setFetchedProof(response.proof);
+      if (response.proof.proof) {
+        setFetchedProof(response.proof.proof);
+      }
+
+      if (response.proof.id) {
+        setFetchedJobID(response.proof.id)
       }
 
       console.log("RESPONSE: ", response)
@@ -243,7 +249,7 @@ export default function Form() {
               Generate Proof
             </button>}
               <div style={{margin: '2em'}}>
-                <PacmanLoader loading={isFetching || isVerifying}/>
+                <PacmanLoader color="yellow" loading={isFetching || isVerifying}/>
               </div>
             {responseMessage && <p>{responseMessage}</p>}
 
@@ -297,19 +303,11 @@ export default function Form() {
               />
             </div>
 
-            {/* Submit Button */}
-            <button
-              className="mt-6 rounded-md border-2 bg-[#1A1D22] px-4 py-4 font-medium text-white">
-              Sign Hash
-            </button>
-
-            <div style={{margin: '2em'}}>
-                <PacmanLoader loading={false}/>
-              </div>
-          </div>
-        )}
+          <button
+            className=" mt-8 rounded-md border-2 bg-[#1A1D22] px-4 py-2 font-medium text-white">
+            Sign Hash
+          </button>
+        </div>)}
       </div>
-
-    </div>
-  );
-}
+      </div>
+)}

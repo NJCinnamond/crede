@@ -86,7 +86,7 @@ export async function generateAndWaitForProof(payload: ProofGenerationPayload) {
   }
 
   export type ProofVerificationPayload = {
-    job_id: string
+    id: string
     proof: string
   }
   

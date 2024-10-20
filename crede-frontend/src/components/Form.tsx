@@ -70,7 +70,7 @@ export default function Form() {
   };
 
   return (
-    <div className="mt-20 h-screen p-20">
+    <div className="mt-52 h-screen p-20">
       {/* Tabs for switching between forms */}
       <div className="relative mx-auto w-2/5  ">
         <div className="flex">

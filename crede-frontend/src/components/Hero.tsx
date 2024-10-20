@@ -46,8 +46,8 @@ export default function Hero() {
       {/* Tilted gray rectangle (set behind using z-index) */}
       <div className="absolute bottom-[-600px] left-0 z-0 h-[80vh] w-full origin-bottom-left rotate-[-10deg] transform rounded-md bg-[#0B0C0C] bg-opacity-95 shadow-[0_0_30px_10px_rgba(255,255,255,0.3)]"></div>
 
-      {/* Layerzero image at the bottom */}
-      <div className="relative z-10 mt-48 flex w-full items-center justify-evenly bg-black py-10 pb-10">
+      {/* Adjusted Layerzero image at the bottom */}
+      <div className="relative z-10 mt-16 flex w-full items-center justify-evenly bg-black py-12">
         <div className="absolute bottom-0 left-0 h-1 w-full">
           <div className="h-full w-full bg-gradient-to-r from-transparent via-white to-transparent"></div>
         </div>

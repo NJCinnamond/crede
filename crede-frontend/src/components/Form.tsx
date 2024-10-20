@@ -2,6 +2,27 @@
 
 import { useState } from "react";
 import { buildPoseidon } from "circomlibjs";
+import { getSignatureForHash } from "../../rpc/skale";
+import { ProofGenerationPayload, generateAndWaitForProof, verifyProof } from "@/services/credeApiService";
+import { PacmanLoader } from 'react-spinners';
+
+const splitBigIntToHexChunks = (bigIntValue: bigint) => {
+  const mask = BigInt("0xFFFFFFFFFFFFFFFF");
+  let chunks = [];
+
+  for (let i = 0; i < 4; i++) {
+    chunks.push('0x' + (bigIntValue & mask).toString(16));
+    bigIntValue = bigIntValue >> BigInt(64);
+  }
+
+  return chunks;
+};
+
+function convertMsgHash(msgHashParts: string[]): string {
+  return '0x' + msgHashParts
+    .map(part => part.replace('0x', ''))
+    .join('');
+}
 
 export default function Form() {
   const [activeTab, setActiveTab] = useState<string>("form1"); // State to track active tab
@@ -10,24 +31,45 @@ export default function Form() {
   const [expiryDate, setExpiryDate] = useState<string>("");
   const [responseMessage, setResponseMessage] = useState<string>("");
 
-  const splitBigIntToHexChunks = (bigIntValue: bigint) => {
-    const mask = BigInt("0xFFFFFFFFFFFFFFFF");
-    const chunks = [];
+  const [isFetching, setIsFetching] = useState<boolean>(false);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
-    for (let i = 0; i < 4; i++) {
-      chunks.push((bigIntValue & mask).toString(16));
-      bigIntValue = bigIntValue >> BigInt(64);
+  const [fetchedProof, setFetchedProof] = useState<string | null>(null);
+  const [fetchedJobID, setFetchedJobID] = useState<string | null>(null)
+
+  const onProofVerify = async () => {
+    if (!fetchedProof || !fetchedJobID) {
+      return null
     }
 
-    return chunks.reverse();
-  };
+    setIsVerifying(true)
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+    try {
+      await verifyProof({
+        job_id: fetchedJobID,
+        proof: fetchedProof
+      })
+      setIsVerifying(false)
+    } catch (error) {
+      console.error("Error veirfying the proof", error);
+      setResponseMessage("Failed to verify proof.");
+      setIsVerifying(false)
+    } 
+  }
+  
+  const handleSubmit = async () => {
 
+    const expiryDateObj = new Date(expiryDate);
+    const formattedExpiryDate = `${(expiryDateObj.getDate()+1).toString().padStart(2, '0')}${(expiryDateObj.getMonth()+1).toString().padStart(2, '0')}${expiryDateObj.getFullYear()}`;
+    const birthdateObj = new Date(birthdate);
+
+    const formattedBirthDate = `${(birthdateObj.getDate()+1).toString().padStart(2, '0')}${(birthdateObj.getMonth()+1).toString().padStart(2, '0')}${birthdateObj.getFullYear()}`;
+
+    // convert ID, birthdate, and expiry date to BigInt
     const idNumberBigInt = BigInt(idNumber);
-    const birthdateBigInt = BigInt(new Date(birthdate).getTime());
-    const expiryDateBigInt = BigInt(new Date(expiryDate).getTime());
+    const birthdateBigInt = BigInt(formattedBirthDate);
+    const expiryDateBigInt = BigInt(formattedExpiryDate);
+
 
     const poseidon = await buildPoseidon();
 
@@ -37,35 +79,78 @@ export default function Form() {
 
     const msghashChunks = splitBigIntToHexChunks(poseidonHashBigInt);
 
+    // Calculate current timestamp unix time in seconds
     const currentTimestamp: string = Math.floor(Date.now() / 1000).toString();
 
-    const payload = {
-      birthdate_timstamp: new Date(birthdate).getTime(),
-      id_number: parseInt(idNumber),
-      expiry_date: new Date(expiryDate).getTime(),
+    // TODO: query the scale API to get signature
+    const docKeyHash = convertMsgHash(msghashChunks)
+    console.log("Doc key hash: ", docKeyHash)
+    const docInfo = await getSignatureForHash(docKeyHash)
+
+    // crypographic signature fetched from blockchain (use external blockchain library)
+    //const sig_r: string[] = ["signature_r"];
+    //const sig_s: string[] = ["signature_s"];
+
+    const sig_r: string[] = [
+      "0x2df01549a50bc279",
+      "0x5d7eb2e38d83a563",
+      "0xe99cc599fd61a917",
+      "0x4d0bf5623c59274d"
+    ]
+
+    const sig_s: string[] = [
+      "0xba1abc8b2649ae5c",
+      "0xfdba11b93523cc06",
+      "0x74ed0f8cb647b4ce",
+      "0x129e301b0dad2386"
+    ]
+
+    const pub_key: string[][] = [
+      [
+        "0x5017dcb88e507d84",
+        "0xb81b1d2ca0e8ad16",
+        "0xe4fa30772b71fad8",
+        "0xd56e7faa66e7d481"
+      ],
+      [
+        "0x03d7e3d9ed743025",
+        "0xf54e3483770694f3",
+        "0x257b2728c36d06e2",
+        "0xdcbc845e2a192239"
+      ]
+    ];
+
+    const payload: ProofGenerationPayload = {
+      birthdate_timestamp: Number(birthdateBigInt),
+      id_number: Number(idNumber),
+      expiry_date: Number(expiryDateBigInt),
       msghash: msghashChunks,
+      sig_r: sig_r,
+      sig_s: sig_s,
+      pub_key: pub_key,
       current_timestamp: currentTimestamp,
     };
 
     try {
-      const mockResponse = {
-        proof: `{
-          "curve": "bn128",
-          "pi_a": ["example_data"],
-          "pi_b": [["example_data"]],
-          "pi_c": ["example_data"],
-          "protocol": "groth16"
-        }`,
-        status: "success",
-      };
+      setIsFetching(true)
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setResponseMessage(
-        `Status: ${mockResponse.status}, Proof: ${mockResponse.proof}`
-      );
+      //await new Promise((resolve) => setTimeout(resolve, 500));
+      // Example usage:
+      const response = await generateAndWaitForProof(payload);
+
+      // const data = await response.json();
+      setResponseMessage(`Status: ${response}`);
+
+      if (response.proof) {
+        setFetchedProof(response.proof);
+      }
+
+      console.log("RESPONSE: ", response)
+      setIsFetching(false)
     } catch (error) {
       console.error("Error submitting the form", error);
       setResponseMessage("Failed to generate proof.");
+      setIsFetching(false)
     }
   };
 
@@ -98,8 +183,7 @@ export default function Form() {
       {/* Render the corresponding form based on the active tab */}
       <div className="mx-auto w-2/5 rounded-bl-lg rounded-br-lg rounded-tr-lg  bg-[#1A1D22] p-8">
         {activeTab === "form1" && (
-          <form
-            onSubmit={handleSubmit}
+          <div
             className="flex flex-col space-y-6 text-2xl">
             {/* Birthdate Field */}
             <div className="mb-8 flex flex-col space-y-2">
@@ -144,17 +228,32 @@ export default function Form() {
             </div>
 
             {/* Submit Button */}
-            <button
-              type="submit"
+            
+
+            {fetchedProof ? (
+                <>
+                  <span>{'Proof fetched successfully'}</span>
+                  <button onClick={onProofVerify} className="border-2 border-blue-500">
+                    {'Verify'}
+                  </button>
+                </>
+              ): <button
+              onClick={handleSubmit}
               className="mt-6 rounded-md border-2 bg-[#1A1D22] px-4 py-4 font-medium text-white">
               Generate Proof
-            </button>
-          </form>
+            </button>}
+              <div style={{margin: '2em'}}>
+                <PacmanLoader loading={isFetching || isVerifying}/>
+              </div>
+            {responseMessage && <p>{responseMessage}</p>}
+
+            
+          </div>
         )}
 
         {activeTab === "form2" && (
-          <form
-            onSubmit={handleSubmit}
+          <div
+            onClick={handleSubmit}
             className="flex flex-col space-y-6 text-2xl">
             {/* Birthdate Field */}
             <div className="mb-8 flex flex-col space-y-2">
@@ -200,20 +299,17 @@ export default function Form() {
 
             {/* Submit Button */}
             <button
-              type="submit"
               className="mt-6 rounded-md border-2 bg-[#1A1D22] px-4 py-4 font-medium text-white">
-              Generate Proof
+              Sign Hash
             </button>
-          </form>
+
+            <div style={{margin: '2em'}}>
+                <PacmanLoader loading={false}/>
+              </div>
+          </div>
         )}
       </div>
 
-      {/* Response Message */}
-      {responseMessage && (
-        <p className="mx-auto mt-4 w-2/5 text-center text-lg text-white">
-          {responseMessage}
-        </p>
-      )}
     </div>
   );
 }

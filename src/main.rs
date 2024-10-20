@@ -4,7 +4,8 @@ extern crate serde_json;
 use std::sync::Arc;
 use std::env;
 use std::net::SocketAddr;
-use actix_web::{web, App, HttpServer, Responder, HttpResponse, post, get};
+use actix_web::{web, App, HttpServer, Responder, HttpResponse, post, get, middleware};
+use actix_cors::Cors;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::fs::File;
@@ -276,6 +277,17 @@ async fn main() -> std::io::Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
     HttpServer::new(move || {
+        // Create a CORS middleware instance
+        let cors = Cors::permissive() 
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+            .allowed_headers(vec![
+                actix_web::http::header::AUTHORIZATION,
+                actix_web::http::header::ACCEPT,
+                actix_web::http::header::CONTENT_TYPE,
+            ])
+            .supports_credentials()
+            .max_age(3600);
+
         App::new()
             .app_data(web::Data::new(shared_state.clone()))
             .service(generate_proof)

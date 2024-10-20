@@ -143,36 +143,35 @@ contract Source is OFT, Verifier {
         _mint(_to, _amount);
     }
 
-    // function _lzSend(
-    //     uint32 _dstEid,
-    //     bytes memory _message,
-    //     bytes memory _options,
-    //     MessagingFee memory _fee,
-    //     address _refundAddress
-    // )
-    //     internal
-    //     virtual
-    //     override
-    //     returns (MessagingReceipt memory receipt)
-    // {
-    //     // @dev Push corresponding fees to the endpoint, any excess is sent back to the _refundAddress from the
-    //     // endpoint.
-    //     _payNative(_fee.nativeFee);
-    //     if (_fee.lzTokenFee > 0) _payLzToken(_fee.lzTokenFee);
+    function _lzSend(
+        uint32 _dstEid,
+        bytes memory _message,
+        bytes memory _options,
+        MessagingFee memory _fee,
+        address _refundAddress
+    )
+        internal
+        virtual
+        override
+        returns (MessagingReceipt memory receipt)
+    {
+        // @dev Push corresponding fees to the endpoint, any excess is sent back to the _refundAddress from the
+        // endpoint.
+        _payNative(_fee.nativeFee);
+        if (_fee.lzTokenFee > 0) _payLzToken(_fee.lzTokenFee);
 
-    //     return endpoint
-    //         // solhint-disable-next-line check-send-result
-    //         .send(
-    //         MessagingParams(_dstEid, _getPeerOrRevert(_dstEid), _message, _options, _fee.lzTokenFee > 0),
-    // _refundAddress
-    //     );
-    // }
+        return endpoint
+            // solhint-disable-next-line check-send-result
+            .send(
+            MessagingParams(_dstEid, _getPeerOrRevert(_dstEid), _message, _options, _fee.lzTokenFee > 0), _refundAddress
+        );
+    }
 
-    // function _payNative(uint256 _nativeFee) internal virtual override returns (uint256 nativeFee) {
-    //     address nativeErc20 = endpoint.nativeToken();
-    //     if (nativeErc20 == address(0)) revert LzAltTokenUnavailable();
+    function _payNative(uint256 _nativeFee) internal virtual override returns (uint256 nativeFee) {
+        address nativeErc20 = endpoint.nativeToken();
+        if (nativeErc20 == address(0)) revert LzAltTokenUnavailable();
 
-    //     // Pay Alt token fee by sending tokens to the endpoint.
-    //     IERC20(nativeErc20).safeTransferFrom(msg.sender, address(endpoint), _nativeFee);
-    // }
+        // Pay Alt token fee by sending tokens to the endpoint.
+        IERC20(nativeErc20).safeTransferFrom(msg.sender, address(endpoint), _nativeFee);
+    }
 }

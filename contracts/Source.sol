@@ -2,27 +2,58 @@
 
 pragma solidity ^0.8.22;
 
-import { OApp, MessagingFee, Origin, MessagingReceipt } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import { MessagingFee, MessagingReceipt } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import { MessagingParams } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
+import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { OFT } from "@layerzerolabs/oft-evm/contracts/OFT.sol";
 import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
+import { SendParam } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 
 /**
  * @notice THIS IS AN EXAMPLE CONTRACT. DO NOT USE THIS CODE IN PRODUCTION.
  */
-contract Source is OApp {
+contract Source is OFT {
     using OptionsBuilder for bytes;
+    using SafeERC20 for IERC20;
 
-    mapping(address receiver => uint256 amount) public accounting;
+    error LzAltTokenUnavailable();
 
-    mapping(bytes32 guid => bool processed) public inboundGUIDs;
-    mapping(bytes32 guid => bool processed) public outboundGUIDs;
+    struct DocInfo {
+        address prover;
+        bytes docHash;
+        bytes signedHash;
+        bytes publicInput;
+        bytes verificationKey;
+        bytes proof;
+        uint40 timestamp;
+    }
 
-    event MessageSent(bytes message, uint32 dstEid, bytes32 guid);
-    event MessageResolved(bytes32 guid, address receiver, uint256 amount);
+    mapping(bytes32 hashKey => DocInfo docInfo) public docInfos;
 
-    error Source__MessageAlreadyProcessed();
-    error Source__InvalidAccountingForReceiver();
-    error Source__UnknownGUID();
+    address public issuer;
+    uint256 public tokenReward;
+
+    event DocIssued(
+        bytes32 indexed hashKey,
+        address prover,
+        bytes docHash,
+        bytes signedHash,
+        bytes publicInput,
+        bytes verificationKey
+    );
+
+    event DocProofUpdated(bytes32 indexed hashKey, bytes proof);
+
+    error Source__OnlyIssuer();
+    error Source__IncorrectProver();
+
+    modifier onlyIssuer() {
+        if (msg.sender != issuer) {
+            revert Source__OnlyIssuer();
+        }
+        _;
+    }
 
     /// The `_options` variable is typically provided as an argument to both the `_quote` and `_lzSend` functions.
     /// In this example, we demonstrate how to generate the `bytes` value for `_options` and pass it manually.
@@ -31,11 +62,18 @@ contract Source is OApp {
     /// An off-chain equivalent can be found under 'Message Execution Options' in the LayerZero V2 Documentation.
     // bytes _options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(50000, 0);
 
-    /**
-     * @notice Initializes the OApp with the source chain's endpoint address.
-     * @param _endpoint The endpoint address.
-     */
-    constructor(address _endpoint, address _owner) OApp(_endpoint, _owner) Ownable(_owner) { }
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        address _lzEndpoint,
+        address _delegate,
+        address _issuer
+    )
+        OFT(_name, _symbol, _lzEndpoint, _delegate)
+        Ownable(_delegate)
+    {
+        issuer = _issuer;
+    }
 
     /**
      * @dev Converts an address to bytes32.
@@ -63,91 +101,89 @@ contract Source is OApp {
         return abi.decode(_encodedMessage, (address, uint256));
     }
 
-    /**
-     * @notice Quotes the gas needed to pay for the full omnichain transaction in native gas or ZRO token.
-     * @param _dstEid Destination chain's endpoint ID.
-     * @param _encodedMessage The encoded message.
-     * @param _options Message execution options (e.g., for sending gas to destination).
-     * @param _payInLzToken Whether to return fee in ZRO token.
-     * @return fee A `MessagingFee` struct containing the calculated gas fee in either the native token or ZRO token.
-     */
-    function quote(
-        uint32 _dstEid,
-        bytes memory _encodedMessage,
-        bytes memory _options,
-        bool _payInLzToken
-    )
-        public
-        view
-        returns (MessagingFee memory fee)
-    {
-        fee = _quote(_dstEid, _encodedMessage, _options, _payInLzToken);
+    function setIssuer(address _issuer) public onlyOwner {
+        issuer = _issuer;
     }
 
-    /**
-     * @dev Sends a message from the source to destination chain.
-     *      Encodes the message as bytes and sends it using the `_lzSend` internal function.
-     * @notice see your LayerZero transaction by pasting the hash in https://testnet.layerzeroscan.com/
-     * @param _dstEid The endpoint ID of the destination chain.
-     * @param _encodedMessage The encoded message to be sent.
-     * @param _options Additional options for message execution.
-     * @return receipt A `MessagingReceipt` struct containing details of the message sent.
-     */
-    function send(
-        uint32 _dstEid,
-        bytes memory _encodedMessage,
-        bytes calldata _options
+    // we can encode the receiver, prover, and verifier in the message
+    function issueDoc(
+        address _prover,
+        uint40 _timestamp,
+        bytes calldata _docHash,
+        bytes calldata _signedHash,
+        bytes calldata _publicInput,
+        bytes calldata _verificationKey,
+        SendParam calldata _sendParam,
+        MessagingFee calldata _fee,
+        address _refundAddress
     )
         external
-        payable
-        returns (MessagingReceipt memory receipt)
+        onlyIssuer
     {
-        // Encodes the message before invoking _lzSend.
-        // we assume the receiver and amount are valid just for testing purposes.
-        (address _receiver, uint256 _amount) = abi.decode(_encodedMessage, (address, uint256));
+        bytes32 _hashKey = keccak256(_docHash);
 
-        receipt = _lzSend(
-            _dstEid,
-            _encodedMessage,
-            _options,
-            // Fee in native gas and ZRO token.
-            MessagingFee(msg.value, 0),
-            // Refund address in case of failed source message.
-            payable(msg.sender)
-        );
+        DocInfo memory _docInfo = DocInfo({
+            prover: _prover,
+            docHash: _docHash,
+            signedHash: _signedHash,
+            publicInput: _publicInput,
+            verificationKey: _verificationKey,
+            proof: "", // Will be stored later by the prover
+            timestamp: _timestamp
+        });
 
-        outboundGUIDs[receipt.guid] = true;
-        accounting[_receiver] += _amount;
+        docInfos[_hashKey] = _docInfo;
 
-        emit MessageSent(_encodedMessage, _dstEid, receipt.guid);
+        _send(_sendParam, _fee, _refundAddress);
+
+        // Emit an event to notify the client that the document has been issued.
+        emit DocIssued(_hashKey, _prover, _docHash, _signedHash, _publicInput, _verificationKey);
     }
 
-    function _lzReceive(
-        Origin calldata, /*_origin*/
-        bytes32 _guid,
-        bytes calldata _payload,
-        address, /*_executor*/
-        bytes calldata /*_extraData*/
+    function setProof(bytes32 _hashKey, bytes calldata _proof, uint40 _timestamp) external {
+        if (msg.sender != docInfos[_hashKey].prover) {
+            revert Source__IncorrectProver();
+        }
+        DocInfo storage _docInfo = docInfos[_hashKey];
+        _docInfo.proof = _proof;
+        _docInfo.timestamp = _timestamp;
+
+        emit DocProofUpdated(_hashKey, _proof);
+    }
+
+    function mint(address _to, uint256 _amount) public {
+        _mint(_to, _amount);
+    }
+
+    function _lzSend(
+        uint32 _dstEid,
+        bytes memory _message,
+        bytes memory _options,
+        MessagingFee memory _fee,
+        address _refundAddress
     )
         internal
+        virtual
         override
+        returns (MessagingReceipt memory receipt)
     {
-        (bytes32 _unProcessedGuid, address _receiver, uint256 _amount) =
-            abi.decode(_payload, (bytes32, address, uint256));
+        // @dev Push corresponding fees to the endpoint, any excess is sent back to the _refundAddress from the
+        // endpoint.
+        _payNative(_fee.nativeFee);
+        if (_fee.lzTokenFee > 0) _payLzToken(_fee.lzTokenFee);
 
-        if (!outboundGUIDs[_unProcessedGuid]) {
-            revert Source__UnknownGUID();
-        }
+        return endpoint
+            // solhint-disable-next-line check-send-result
+            .send(
+            MessagingParams(_dstEid, _getPeerOrRevert(_dstEid), _message, _options, _fee.lzTokenFee > 0), _refundAddress
+        );
+    }
 
-        if (accounting[_receiver] < _amount) {
-            revert Source__InvalidAccountingForReceiver();
-        }
+    function _payNative(uint256 _nativeFee) internal virtual override returns (uint256 nativeFee) {
+        address nativeErc20 = endpoint.nativeToken();
+        if (nativeErc20 == address(0)) revert LzAltTokenUnavailable();
 
-        // have a strict check according to the receiver in production
-        accounting[_receiver] -= _amount;
-
-        inboundGUIDs[_guid] = true;
-
-        emit MessageResolved(_guid, _receiver, _amount);
+        // Pay Alt token fee by sending tokens to the endpoint.
+        IERC20(nativeErc20).safeTransferFrom(msg.sender, address(endpoint), _nativeFee);
     }
 }

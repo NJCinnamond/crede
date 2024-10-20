@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { cookieToInitialState } from "@account-kit/core";
-import { headers } from "next/headers";
-import { config } from "./config";
-import { Providers } from "./providers";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -27,17 +23,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // This will allow us to persist state across page boundaries (read more here: https://accountkit.alchemy.com/react/ssr#persisting-the-account-state)
-  const initialState = cookieToInitialState(
-    config,
-    headers().get("cookie") ?? undefined
-  );
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers initialState={initialState}>{children}</Providers>
+        {children}
       </body>
     </html>
   );

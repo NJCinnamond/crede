@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { buildPoseidon } from "circomlibjs";
 import {
   ProofGenerationPayload,
@@ -8,12 +8,7 @@ import {
   verifyProof,
 } from "@/services/credeApiService";
 import { PacmanLoader } from "react-spinners";
-import {
-  useAuthModal,
-  useLogout,
-  useSignerStatus,
-  useUser,
-} from "@account-kit/react";
+import { ethers } from "ethers";
 
 const splitBigIntToHexChunks = (bigIntValue: bigint) => {
   const mask = BigInt("0xFFFFFFFFFFFFFFFF");
@@ -32,10 +27,9 @@ function convertMsgHash(msgHashParts: string[]): string {
 }
 
 export default function Form() {
-  const user = useUser();
-  const { openAuthModal } = useAuthModal();
-  const signerStatus = useSignerStatus();
-  const { logout } = useLogout();
+  const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
+  const [signer, setSigner] = useState<ethers.providers.JsonRpcSigner | null>(null);
+  const [account, setAccount] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<string>("form1"); // State to track active tab
   const [birthdate, setBirthdate] = useState<string>("");
@@ -178,6 +172,45 @@ export default function Form() {
     }
   };
 
+  useEffect(() => {
+    const initProvider = async () => {
+      if (window.ethereum) {
+        try {
+          // Request account access if needed
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+          // Set provider
+          const newProvider = new ethers.providers.Web3Provider(window.ethereum);
+          setProvider(newProvider);
+
+          // Set signer
+          const newSigner = newProvider.getSigner();
+          setSigner(newSigner);
+
+          // Get account
+          const newAccount = await newSigner.getAddress();
+          setAccount(newAccount);
+
+          // Listen for account changes
+          window.ethereum.on('accountsChanged', (accounts: string[]) => {
+            setAccount(accounts[0]);
+          });
+
+          // Listen for network changes
+          window.ethereum.on('chainChanged', () => {
+            window.location.reload();
+          });
+        } catch (error) {
+          console.error('Error connecting to MetaMask', error);
+        }
+      } else {
+        alert('Please install MetaMask!');
+      }
+    };
+
+    initProvider();
+  }, [provider]);
+
   return (
     <div className="mt-52 h-screen p-20">
       {/* Tabs for switching between forms */}
@@ -208,23 +241,13 @@ export default function Form() {
       <div className="mx-auto w-2/5 rounded-bl-lg rounded-br-lg rounded-tr-lg  bg-[#1A1D22] p-8">
         
       <div className="flex flex-col items-center p-4 gap-4 justify-center text-center">
-        {signerStatus.isInitializing ? (
-          <>Loading...</>
-        ) : user ? (
-          <div className="flex flex-col gap-2 p-2">
-            <p className="text-xl font-bold">Success!</p>
-            You're logged in as {user.email ?? "anon"}.<button
-              className="btn btn-primary mt-6"
-              onClick={() => logout()}
-            >
-              Log out
-            </button>
-          </div>
-        ) : (
-          <button className="btn btn-primary" onClick={openAuthModal}>
-            Login
-          </button>
-        )}
+        {
+          account ? (
+            <p className="text-white">Connected with account: {account}</p>
+          ) : (
+            <p className="text-white">Not connected</p>
+          )
+        }
       </div>
         
         {activeTab === "form1" && (

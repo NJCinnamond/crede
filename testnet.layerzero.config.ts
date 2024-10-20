@@ -3,12 +3,12 @@ import type { OAppOmniGraphHardhat, OmniPointHardhat } from "@layerzerolabs/tool
 
 const skaleContract: OmniPointHardhat = {
   eid: EndpointId.SKALE_V2_TESTNET,
-  contractName: "Source",
+  contractName: "Destination",
 };
 
 const amoyContract: OmniPointHardhat = {
   eid: EndpointId.AMOY_V2_TESTNET,
-  contractName: "Destination",
+  contractName: "Source",
 };
 
 const config: OAppOmniGraphHardhat = {

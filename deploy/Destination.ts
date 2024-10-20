@@ -1,8 +1,7 @@
 import assert from "assert";
 import { type DeployFunction } from "hardhat-deploy/types";
 
-// TODO declare your contract name here
-const contractName = "MyOApp";
+const contractName = "Destination";
 
 const deploy: DeployFunction = async (hre) => {
   const { getNamedAccounts, deployments } = hre;
@@ -36,11 +35,13 @@ const deploy: DeployFunction = async (hre) => {
   const { address } = await deploy(contractName, {
     from: deployer,
     args: [
-      endpointV2Deployment.address, // LayerZero's EndpointV2 address
-      deployer, // owner
+      "destinationToken", // _name
+      "DCrede", // _symbol
+      endpointV2Deployment.address, // _lzEndpoint
+      deployer, // _delegate
     ],
     log: true,
-    skipIfAlreadyDeployed: false,
+    // skipIfAlreadyDeployed: false,
   });
 
   console.log(`Deployed contract: ${contractName}, network: ${hre.network.name}, address: ${address}`);

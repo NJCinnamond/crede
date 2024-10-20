@@ -1,17 +1,22 @@
 import "@layerzerolabs/toolbox-hardhat";
+import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomicfoundation/hardhat-foundry";
-import "@nomicfoundation/hardhat-toolbox";
+import "@nomicfoundation/hardhat-verify";
+import "@nomiclabs/hardhat-ethers";
 import "@primitivefi/hardhat-dodoc";
+import "@typechain/hardhat";
 import "@typechain/hardhat";
 import { config as dotenvConfig } from "dotenv";
 import "hardhat-contract-sizer";
 import "hardhat-deploy";
+import "hardhat-gas-reporter";
 import "hardhat-gas-reporter";
 import { removeConsoleLog } from "hardhat-preprocessor";
 import "hardhat-storage-layout";
 import type { HardhatUserConfig } from "hardhat/config";
 import type { HttpNetworkAccountsUserConfig, NetworkUserConfig } from "hardhat/types";
 import { resolve } from "path";
+import "solidity-coverage";
 
 import { API_KEYS, CUSTOM_CHAINS, DEVELOPMENT_CHAINS, NETWORKS, Network, NetworkName } from "./config";
 import "./tasks";

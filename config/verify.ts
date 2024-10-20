@@ -10,9 +10,9 @@ export const API_KEYS: string | Record<string, string> | undefined = {
   mainnet: process.env.ETHERSCAN_API_KEY || "",
   sepolia: process.env.ETHERSCAN_API_KEY || "",
 
-  // BASE
-  base: process.env.BASESCAN_API_KEY || "",
-  baseSepolia: process.env.BASESCAN_API_KEY || "",
+  // // BASE
+  // base: process.env.BASESCAN_API_KEY || "",
+  // baseSepolia: process.env.BASESCAN_API_KEY || "",
 
   // BINANCE SMART CHAIN
   bsc: process.env.BSCSCAN_API_KEY || "",

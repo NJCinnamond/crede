@@ -94,7 +94,7 @@ export const NETWORKS: { readonly [key in NetworkName]: Network } = {
     url: process.env.RPC_POLYGON_MAINNET || "https://rpc.ankr.com/polygon",
   },
   [NetworkName.POLYGON_AMOY]: {
-    eid: EndpointId.POLYGON_V2_TESTNET,
+    eid: EndpointId.AMOY_V2_TESTNET,
     chainId: 80_002,
     url: process.env.RPC_POLYGON_AMOY || "https://rpc.ankr.com/polygon_amoy",
   },

@@ -31,7 +31,9 @@
     "react-spinners": "^0.14.1",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@layerzerolabs/lz-v2-utilities": "^2.3.39",
+    "@layerzerolabs/lz-definitions": "^2.3.39"
   },
   "devDependencies": {
     "@types/node": "^20",

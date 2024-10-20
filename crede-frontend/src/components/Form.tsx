@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { buildPoseidon } from "circomlibjs";
 import {
   ProofGenerationPayload,
@@ -8,8 +8,10 @@ import {
   verifyProof,
 } from "@/services/credeApiService";
 import { PacmanLoader } from "react-spinners";
-import { ethers } from "ethers";
-import {ContractABI} from "../../rpc/Contract";
+import { BigNumber, ethers } from "ethers";
+import {ContractABI,IERC20ABI} from "../../rpc/Contract";
+import { EndpointId } from "@layerzerolabs/lz-definitions";
+import { Options } from "@layerzerolabs/lz-v2-utilities";
 
 const splitBigIntToHexChunks = (bigIntValue: bigint) => {
   const mask = BigInt("0xFFFFFFFFFFFFFFFF");
@@ -27,11 +29,19 @@ function convertMsgHash(msgHashParts: string[]): string {
   return "0x" + msgHashParts.map((part) => part.replace("0x", "")).join("");
 }
 
+interface DocInfo {
+  prover: string;
+  timestamp: number;
+  signedHash: string;
+  proof: string;
+}
+
 export default function Form() {
   const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
-  const [signer, setSigner] = useState<ethers.providers.JsonRpcSigner | null>(null);
   const [account, setAccount] = useState<string | null>(null);
   const [contract, setContract] = useState<ethers.Contract | null>(null);
+  const [token, setToken] = useState<ethers.Contract | null>(null);
+  const [info, setInfo] = useState<DocInfo | null>(null);
 
   const [activeTab, setActiveTab] = useState<string>("form1"); // State to track active tab
   const [birthdate, setBirthdate] = useState<string>("");
@@ -174,6 +184,7 @@ export default function Form() {
     }
   };
 
+
   useEffect(() => {
     const initProvider = async () => {
       if (window.ethereum) {
@@ -185,9 +196,7 @@ export default function Form() {
           const newProvider = new ethers.providers.Web3Provider(window.ethereum);
           setProvider(newProvider);
 
-          // Set signer
           const newSigner = newProvider.getSigner();
-          setSigner(newSigner);
 
           // Get account
           const newAccount = await newSigner.getAddress();
@@ -196,6 +205,9 @@ export default function Form() {
           // Create the contract instance
           const newContract = new ethers.Contract("0xf7f861870aC67B27322E6f23f3442E660103Ce00", ContractABI, newSigner);
           setContract(newContract);
+
+          const tokenContract = new ethers.Contract("0x6c71319b1F910Cf989AD386CcD4f8CC8573027aB", IERC20ABI, newSigner);
+          setToken(tokenContract);
 
           // Listen for account changes
           window.ethereum.on('accountsChanged', (accounts: string[]) => {
@@ -214,8 +226,91 @@ export default function Form() {
       }
     };
 
+    
     initProvider();
-  }, [provider]);
+  }, [provider, contract]);
+  
+  const getDocInfo = useCallback(async () => {
+    if (!contract) {
+      return;
+    }
+    const docKeyHash = "0x3fa871cd666032ad35b81e203f034a394a41145d6e411b93c91c4149027bba00"
+    return await contract.docInfos(docKeyHash);
+  }, [contract])
+
+  useEffect(() => {
+    getDocInfo().then((docInfo) => {
+      console.log("Doc Info: ", docInfo);
+      setInfo(docInfo);
+    });
+  },[getDocInfo])
+
+  const callIssueDoc = useCallback(async () => {
+      if (!contract || !token || !account) {
+        return;
+      }
+
+      // Defining the amount of tokens to send and constructing the parameters for the send operation
+      const tokensToSend = ethers.utils.parseEther("1");
+
+      // Defining extra message execution options for the send operation
+      const options = Options.newOptions().addExecutorLzReceiveOption(2000000, 0).toHex().toString();
+
+      await token.approve(contract.address, ethers.utils.parseEther("100000000000000000"));
+
+      const sendParam = [
+        EndpointId.AMOY_V2_TESTNET,
+        ethers.utils.zeroPad(account, 32),
+        tokensToSend,
+        tokensToSend,
+        options,
+        "0x",
+      ]
+
+      // Fetching the native fee for the token send operation
+      const [nativeFee] = await contract.quoteSend(sendParam, false);
+
+      console.log("nativeFee: ", nativeFee);
+
+      // fee
+      const fee = {
+        nativeFee,
+        lzTokenFee: 0,
+      };
+
+      const docKeyHash = "0x3fa871cd666032ad35b81e203f034a394a41145d6e411b93c91c4149027bba00"
+
+      const signedHash = ethers.utils.toUtf8Bytes(
+        '{"sigR":["0x2df01549a50bc279","0x5d7eb2e38d83a563","0xe99cc599fd61a917","0x4d0bf5623c59274d"],"sigS":["0xba1abc8b2649ae5c","0xfdba11b93523cc06","0x74ed0f8cb647b4ce","0x129e301b0dad2386"]}'
+      );
+
+      const tx = await contract.issueDoc(account, docKeyHash, signedHash, sendParam, fee, {
+        value: nativeFee.add(BigNumber.from("10000000000000000")),
+      });
+      console.log(`Transaction hash: ${(await tx.wait()).transactionHash}`);
+  }, [contract, token, account])
+
+  const setProof = useCallback(async () => {
+
+      if (!contract) {
+        return;
+      }
+
+      const sampleProof = ethers.utils.toUtf8Bytes(
+      '{"curve":"bn128","pi_a":["9101883383049000104073619355601631108699415048629057425244512952930590364012","14934657682890689746053652093146976332194029865174971459032167110397473537949","1"],"pi_b":[["14021879761272328052390042351303534418318878686560723234568697033225283024566","4806846995601770419162529313601536774988514956526598728824403473260395977689"],["13709445512919846353785661709905806350777195619348686974284763017443907186970","4414084233285007101997778311773381986137166860704772030966271135988114835460"],["1","0"]],"pi_c":["20800646827339092164260847061948185912328706503481541270320821731079287451974","16340311457184926111282441001594733088258559531093324393067085734266031169503","1"],"protocol":"groth16"}'
+    );
+    
+    const bytes = ethers.utils.toUtf8Bytes("0x8c8d678fb414a28c6b55dcd33c306453cbeaaa8472f8361d24093fd7d2db574f");
+    const docKeyHash = ethers.utils.keccak256(bytes);
+
+      // timestamp
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  const tx = await contract.setProof(docKeyHash, sampleProof, timestamp);
+  console.log(`Transaction hash: ${(await tx.wait()).transactionHash}`);
+
+
+  }, [contract])
 
   return (
     <div className="mt-52 h-screen p-20">
@@ -374,10 +469,33 @@ export default function Form() {
               />
             </div>
 
-            <button className="mt-8 rounded-md border-2 bg-[#1A1D22] px-4 py-2 font-medium text-white">
+
+          </div>
+        )}
+            <button className="mt-8 rounded-md border-2 bg-[#1A1D22] px-4 py-2 font-medium text-white"
+            onClick={setProof}
+            >
               Sign Hash
             </button>
+        <button 
+          className="mt-8 rounded-md border-2 bg-[#1A1D22] px-4 py-2 font-medium text-white"
+          onClick={callIssueDoc}
+        >
+          Issue Doc
+        </button>
+
+        {info ? JSON.stringify(info): "no info"}
+
+        {info ? (
+          <div className="mt-8 p-4 bg-gray-800 h-screen rounded-md text-white">
+            <h3 className="text-xl font-bold mb-4">Document Information</h3>
+            <p><strong>Prover:</strong> {info.prover}</p>
+            <p><strong>Timestamp:</strong> {new Date(info.timestamp * 1000).toLocaleString()}</p>
+            <p><strong>Signed Hash:</strong> {info.signedHash}</p>
+            <p><strong>Proof:</strong> {info.proof}</p>
           </div>
+        ) : (
+          <p className="mt-8 text-white">No information available</p>
         )}
       </div>
     </div>

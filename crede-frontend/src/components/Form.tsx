@@ -12,7 +12,7 @@ export default function Form() {
 
   const splitBigIntToHexChunks = (bigIntValue: bigint) => {
     const mask = BigInt("0xFFFFFFFFFFFFFFFF");
-    let chunks = [];
+    const chunks = [];
 
     for (let i = 0; i < 4; i++) {
       chunks.push((bigIntValue & mask).toString(16));

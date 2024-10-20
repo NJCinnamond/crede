@@ -99,7 +99,6 @@ async fn generate_proof(
         match generate_proof_from_inputs(&inputs_clone).await {
             Ok(result) => {
                 let mut jobs = state_clone.jobs.lock().await;
-                info!("job success")
                 if let Some(job) = jobs.get_mut(&job_id_clone) {
                     job.status = "completed".to_string();
                     job.proof = Some(ProofResponse {
@@ -112,7 +111,6 @@ async fn generate_proof(
             Err(e) => {
                 let mut jobs = state_clone.jobs.lock().await;
                 if let Some(job) = jobs.get_mut(&job_id_clone) {
-                    info!("Error with job")
                     job.status = "failed".to_string();
                     job.error = Some(e);
                 }

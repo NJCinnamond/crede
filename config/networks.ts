@@ -39,6 +39,9 @@ export enum NetworkName {
   // ARBITRUM
   ARBITRUM_MAINNET = "arbitrum-mainnet",
   ARBITRUM_SEPOLIA = "arbitrum-sepolia",
+
+  // skale
+  SKALE = "skale",
 }
 
 export interface Network {
@@ -118,6 +121,13 @@ export const NETWORKS: { readonly [key in NetworkName]: Network } = {
     eid: EndpointId.ARBITRUM_V2_TESTNET,
     chainId: 421_614,
     url: process.env.RPC_ARBITRUM_SEPOLIA || "https://rpc.ankr.com/arbitrum_sepolia",
+  },
+
+  // SKALE
+  [NetworkName.SKALE]: {
+    eid: EndpointId.SKALE_V2_TESTNET,
+    chainId: 1_444_673_419,
+    url: "https://testnet.skalenodes.com/v1/juicy-low-small-testnet",
   },
 } as const;
 

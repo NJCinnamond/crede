@@ -8,12 +8,10 @@ import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { OFT } from "@layerzerolabs/oft-evm/contracts/OFT.sol";
 import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
-import { SendParam } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+import { SendParam, OFTReceipt } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+import { Verifier } from "./Verifier.sol";
 
-/**
- * @notice THIS IS AN EXAMPLE CONTRACT. DO NOT USE THIS CODE IN PRODUCTION.
- */
-contract Source is OFT {
+contract Source is OFT, Verifier {
     using OptionsBuilder for bytes;
     using SafeERC20 for IERC20;
 
@@ -21,32 +19,24 @@ contract Source is OFT {
 
     struct DocInfo {
         address prover;
-        bytes docHash;
-        bytes signedHash;
-        bytes publicInput;
-        bytes verificationKey;
-        bytes proof;
         uint40 timestamp;
+        bytes signedHash;
+        bytes proof;
     }
 
-    mapping(bytes32 hashKey => DocInfo docInfo) public docInfos;
+    mapping(bytes32 docKeyHash => DocInfo docInfo) public docInfos;
 
     address public issuer;
     uint256 public tokenReward;
 
-    event DocIssued(
-        bytes32 indexed hashKey,
-        address prover,
-        bytes docHash,
-        bytes signedHash,
-        bytes publicInput,
-        bytes verificationKey
-    );
+    event DocIssued(bytes32 indexed docKeyHash, address prover, bytes signedHash);
 
-    event DocProofUpdated(bytes32 indexed hashKey, bytes proof);
+    event DocProofUpdated(bytes32 indexed docKeyHash, bytes proof, uint40 timestamp);
 
     error Source__OnlyIssuer();
     error Source__IncorrectProver();
+    error Source__OnlyIssuerCanReceiveTokens();
+    error Source__InvalidTokenRewardRequested();
 
     modifier onlyIssuer() {
         if (msg.sender != issuer) {
@@ -55,24 +45,19 @@ contract Source is OFT {
         _;
     }
 
-    /// The `_options` variable is typically provided as an argument to both the `_quote` and `_lzSend` functions.
-    /// In this example, we demonstrate how to generate the `bytes` value for `_options` and pass it manually.
-    /// The `OptionsBuilder` is used to create new options and add an executor option for `LzReceive` with specified
-    /// parameters.
-    /// An off-chain equivalent can be found under 'Message Execution Options' in the LayerZero V2 Documentation.
-    // bytes _options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(50000, 0);
-
     constructor(
         string memory _name,
         string memory _symbol,
         address _lzEndpoint,
         address _delegate,
-        address _issuer
+        address _issuer,
+        uint256 _initialTokenReward
     )
         OFT(_name, _symbol, _lzEndpoint, _delegate)
         Ownable(_delegate)
     {
         issuer = _issuer;
+        tokenReward = _initialTokenReward;
     }
 
     /**
@@ -105,85 +90,89 @@ contract Source is OFT {
         issuer = _issuer;
     }
 
-    // we can encode the receiver, prover, and verifier in the message
     function issueDoc(
         address _prover,
-        uint40 _timestamp,
-        bytes calldata _docHash,
+        bytes32 _docKeyHash,
         bytes calldata _signedHash,
-        bytes calldata _publicInput,
-        bytes calldata _verificationKey,
         SendParam calldata _sendParam,
-        MessagingFee calldata _fee,
-        address _refundAddress
+        MessagingFee calldata _fee
     )
         external
+        payable
         onlyIssuer
     {
-        bytes32 _hashKey = keccak256(_docHash);
+        if (_sendParam.to != addressToBytes32(issuer)) {
+            revert Source__OnlyIssuerCanReceiveTokens();
+        }
+
+        if (_sendParam.amountLD > tokenReward) {
+            revert Source__InvalidTokenRewardRequested();
+        }
 
         DocInfo memory _docInfo = DocInfo({
             prover: _prover,
-            docHash: _docHash,
             signedHash: _signedHash,
-            publicInput: _publicInput,
-            verificationKey: _verificationKey,
             proof: "", // Will be stored later by the prover
-            timestamp: _timestamp
-        });
+            timestamp: 0 // Will be stored later by the prover
+         });
 
-        docInfos[_hashKey] = _docInfo;
+        docInfos[_docKeyHash] = _docInfo;
 
-        _send(_sendParam, _fee, _refundAddress);
+        // mint some tokens to the issuer
+        _mint(issuer, tokenReward);
+
+        // send tokens to the chainB
+        _send(_sendParam, _fee, issuer);
 
         // Emit an event to notify the client that the document has been issued.
-        emit DocIssued(_hashKey, _prover, _docHash, _signedHash, _publicInput, _verificationKey);
+        emit DocIssued(_docKeyHash, _prover, _signedHash);
     }
 
-    function setProof(bytes32 _hashKey, bytes calldata _proof, uint40 _timestamp) external {
-        if (msg.sender != docInfos[_hashKey].prover) {
+    function setProof(bytes32 _docKeyHash, bytes calldata _proof, uint40 _timestamp) external {
+        if (msg.sender != docInfos[_docKeyHash].prover) {
             revert Source__IncorrectProver();
         }
-        DocInfo storage _docInfo = docInfos[_hashKey];
+        DocInfo storage _docInfo = docInfos[_docKeyHash];
         _docInfo.proof = _proof;
         _docInfo.timestamp = _timestamp;
 
-        emit DocProofUpdated(_hashKey, _proof);
+        emit DocProofUpdated(_docKeyHash, _proof, _timestamp);
     }
 
-    function mint(address _to, uint256 _amount) public {
+    function mint(address _to, uint256 _amount) public onlyOwner {
         _mint(_to, _amount);
     }
 
-    function _lzSend(
-        uint32 _dstEid,
-        bytes memory _message,
-        bytes memory _options,
-        MessagingFee memory _fee,
-        address _refundAddress
-    )
-        internal
-        virtual
-        override
-        returns (MessagingReceipt memory receipt)
-    {
-        // @dev Push corresponding fees to the endpoint, any excess is sent back to the _refundAddress from the
-        // endpoint.
-        _payNative(_fee.nativeFee);
-        if (_fee.lzTokenFee > 0) _payLzToken(_fee.lzTokenFee);
+    // function _lzSend(
+    //     uint32 _dstEid,
+    //     bytes memory _message,
+    //     bytes memory _options,
+    //     MessagingFee memory _fee,
+    //     address _refundAddress
+    // )
+    //     internal
+    //     virtual
+    //     override
+    //     returns (MessagingReceipt memory receipt)
+    // {
+    //     // @dev Push corresponding fees to the endpoint, any excess is sent back to the _refundAddress from the
+    //     // endpoint.
+    //     _payNative(_fee.nativeFee);
+    //     if (_fee.lzTokenFee > 0) _payLzToken(_fee.lzTokenFee);
 
-        return endpoint
-            // solhint-disable-next-line check-send-result
-            .send(
-            MessagingParams(_dstEid, _getPeerOrRevert(_dstEid), _message, _options, _fee.lzTokenFee > 0), _refundAddress
-        );
-    }
+    //     return endpoint
+    //         // solhint-disable-next-line check-send-result
+    //         .send(
+    //         MessagingParams(_dstEid, _getPeerOrRevert(_dstEid), _message, _options, _fee.lzTokenFee > 0),
+    // _refundAddress
+    //     );
+    // }
 
-    function _payNative(uint256 _nativeFee) internal virtual override returns (uint256 nativeFee) {
-        address nativeErc20 = endpoint.nativeToken();
-        if (nativeErc20 == address(0)) revert LzAltTokenUnavailable();
+    // function _payNative(uint256 _nativeFee) internal virtual override returns (uint256 nativeFee) {
+    //     address nativeErc20 = endpoint.nativeToken();
+    //     if (nativeErc20 == address(0)) revert LzAltTokenUnavailable();
 
-        // Pay Alt token fee by sending tokens to the endpoint.
-        IERC20(nativeErc20).safeTransferFrom(msg.sender, address(endpoint), _nativeFee);
-    }
+    //     // Pay Alt token fee by sending tokens to the endpoint.
+    //     IERC20(nativeErc20).safeTransferFrom(msg.sender, address(endpoint), _nativeFee);
+    // }
 }

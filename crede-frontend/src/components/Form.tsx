@@ -9,6 +9,7 @@ import {
 } from "@/services/credeApiService";
 import { PacmanLoader } from "react-spinners";
 import { ethers } from "ethers";
+import {ContractABI} from "../../rpc/Contract";
 
 const splitBigIntToHexChunks = (bigIntValue: bigint) => {
   const mask = BigInt("0xFFFFFFFFFFFFFFFF");
@@ -30,6 +31,7 @@ export default function Form() {
   const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
   const [signer, setSigner] = useState<ethers.providers.JsonRpcSigner | null>(null);
   const [account, setAccount] = useState<string | null>(null);
+  const [contract, setContract] = useState<ethers.Contract | null>(null);
 
   const [activeTab, setActiveTab] = useState<string>("form1"); // State to track active tab
   const [birthdate, setBirthdate] = useState<string>("");
@@ -190,6 +192,10 @@ export default function Form() {
           // Get account
           const newAccount = await newSigner.getAddress();
           setAccount(newAccount);
+
+          // Create the contract instance
+          const newContract = new ethers.Contract("0xf7f861870aC67B27322E6f23f3442E660103Ce00", ContractABI, newSigner);
+          setContract(newContract);
 
           // Listen for account changes
           window.ethereum.on('accountsChanged', (accounts: string[]) => {

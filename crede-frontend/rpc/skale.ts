@@ -1,7 +1,8 @@
 // skaleRPC.ts
 
-import { ethers, Contract, JsonRpcProvider, keccak256 } from 'ethers';
+import { ethers, Contract, BigNumber } from 'ethers';
 import { ContractABI } from './Contract';
+import { keccak256, toUtf8Bytes } from 'ethers/lib/utils';
 
 export enum SKALEChain {
   CALYPSO = 'calypso',
@@ -30,10 +31,10 @@ export class SKALEProvider {
     [SKALEChain.TESTNET]: "https://staging-v3.skalenodes.com/v1/staging-fast-active-bellatrix"
   };
 
-  private provider: JsonRpcProvider;
+  private provider: ethers.providers.JsonRpcProvider;
 
   constructor(config: SKALEProviderConfig) {
-    this.provider = new ethers.JsonRpcProvider(config.endpoint);
+    this.provider = new ethers.providers.JsonRpcProvider(config.endpoint);
   }
 
   /**
@@ -46,7 +47,7 @@ export class SKALEProvider {
   /**
    * Get the underlying ethers provider
    */
-  public getProvider(): JsonRpcProvider {
+  public getProvider(): ethers.providers.JsonRpcProvider {
     return this.provider;
   }
 
@@ -65,14 +66,14 @@ export class SKALEProvider {
    * Get the balance of an address
    */
   public async getBalance(address: string): Promise<{
-    raw: bigint;
+    raw: BigNumber;
     formatted: string;
   }> {
     try {
       const balance = await this.provider.getBalance(address);
       return {
         raw: balance,
-        formatted: ethers.formatEther(balance)
+        formatted: ethers.utils.formatEther(balance)
       };
     } catch (error) {
       throw new Error(`Failed to get balance: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -84,7 +85,7 @@ export class SKALEProvider {
    */
   public getContract<T extends Contract>(
     address: string,
-    abi: ethers.InterfaceAbi
+    abi: any
   ): T {
     try {
       return new Contract(address, abi, this.provider) as T;
@@ -121,7 +122,7 @@ export async function getSignatureForHash(docKey: string) {
 
   console.log("Contract: ", contract)
 
-  const docKeyHash = keccak256(ethers.toUtf8Bytes(docKey));
+  const docKeyHash = keccak256(toUtf8Bytes(docKey));
   const docInfo = await contract.docInfos(docKeyHash)
 
   console.log("Doc info: ", docInfo)

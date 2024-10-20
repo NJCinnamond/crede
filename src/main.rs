@@ -17,9 +17,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use env_logger;
 use tokio::sync::Mutex;
-
 use std::collections::HashMap;
-use log::{info, debug, error};
 
 #[derive(Clone, Serialize)]
 struct JobStatus {
@@ -289,6 +287,8 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
 
         App::new()
+            .wrap(cors)  // Add CORS middleware
+            .wrap(middleware::Logger::default())
             .app_data(web::Data::new(shared_state.clone()))
             .service(generate_proof)
             .service(get_proof_status)

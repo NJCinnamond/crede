@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { buildPoseidon } from "circomlibjs";
+<<<<<<< HEAD
 // import { getSignatureForHash } from "../../rpc/skale";
 import {
   ProofGenerationPayload,
@@ -9,6 +10,17 @@ import {
   verifyProof,
 } from "@/services/credeApiService";
 import { PacmanLoader } from "react-spinners";
+=======
+import { getSignatureForHash } from "../../rpc/skale";
+import { ProofGenerationPayload, generateAndWaitForProof, verifyProof } from "@/services/credeApiService";
+import { PacmanLoader } from 'react-spinners';
+import {
+  useAuthModal,
+  useLogout,
+  useSignerStatus,
+  useUser,
+} from "@account-kit/react";
+>>>>>>> 8660351 (alchemy integeration)
 
 const splitBigIntToHexChunks = (bigIntValue: bigint) => {
   const mask = BigInt("0xFFFFFFFFFFFFFFFF");
@@ -27,6 +39,11 @@ function convertMsgHash(msgHashParts: string[]): string {
 }
 
 export default function Form() {
+  const user = useUser();
+  const { openAuthModal } = useAuthModal();
+  const signerStatus = useSignerStatus();
+  const { logout } = useLogout();
+
   const [activeTab, setActiveTab] = useState<string>("form1"); // State to track active tab
   const [birthdate, setBirthdate] = useState<string>("");
   const [idNumber, setIdNumber] = useState<string>("");
@@ -195,7 +212,28 @@ export default function Form() {
       </div>
 
       {/* Render the corresponding form based on the active tab */}
-      <div className="mx-auto w-2/5 rounded-bl-lg rounded-br-lg rounded-tr-lg bg-[#1A1D22] p-8">
+      <div className="mx-auto w-2/5 rounded-bl-lg rounded-br-lg rounded-tr-lg  bg-[#1A1D22] p-8">
+        
+      <div className="flex flex-col items-center p-4 gap-4 justify-center text-center">
+        {signerStatus.isInitializing ? (
+          <>Loading...</>
+        ) : user ? (
+          <div className="flex flex-col gap-2 p-2">
+            <p className="text-xl font-bold">Success!</p>
+            You're logged in as {user.email ?? "anon"}.<button
+              className="btn btn-primary mt-6"
+              onClick={() => logout()}
+            >
+              Log out
+            </button>
+          </div>
+        ) : (
+          <button className="btn btn-primary" onClick={openAuthModal}>
+            Login
+          </button>
+        )}
+      </div>
+        
         {activeTab === "form1" && (
           <div className="flex flex-col space-y-6 text-2xl">
             {/* Birthdate Field */}
